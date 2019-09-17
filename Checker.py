@@ -13,6 +13,7 @@ config.read('config.ini')
 
 COMPOSERLOCATION = config.get('Shared', 'COMPOSEDIRECTORY')
 COMPOSERFILE = config.get('Checker', 'COMPOSERFILE')
+UPDATERLOGFILE = config.get('Shared', 'LOGFILENAME')
 
 NEEDPOST = config.getboolean('Checker', 'NEEDPOST')
 LASTCHANSE = True
@@ -27,7 +28,7 @@ class Checker:
         self.recepients = recepients
         self.needPost = NEEDPOST
         self.lastChanse = True
-        logging.basicConfig(filename='updater.log', level=logging.INFO, format='%(asctime)s %(message)s')
+        logging.basicConfig(filename=UPDATERLOGFILE, level=logging.INFO, format='%(asctime)s %(message)s')
 
     # Парсим конфиг и забираем имя имеджей, которые доджны работать
     def getServicesYml(self):

@@ -15,14 +15,13 @@ from Mailer import Mailer
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-# Доделать
-
 # Registry
 REGISTRY = config.get('Refresher', 'REGISTRY')
 COMPOSEENVFILE = config.get('Shared', 'COMPOSEENVFILE')
 REG_USERNAME = config.get('Refresher', 'REG_USERNAME')
 REG_PASSWORD = config.get('Refresher', 'REG_PASSWORD')
-
+# Local
+UPDATERLOGFILE = config.get('Shared', 'LOGFILENAME')
 COMPOSERLOCATION = config.get('Shared', 'COMPOSEDIRECTORY')
 CONFTYPEBACKEND = config.get('Refresher', 'CONFTYPEBACKEND')
 CONFTYPEFRONTEND = config.get('Refresher', 'CONFTYPEFRONTEND')
@@ -39,7 +38,7 @@ class Refresher:
         self.currentTags = self.getCurrentTags()
         self.DEPLOYONLYMASTERBACKEND = False
         self.NEEDPOST = False
-        logging.basicConfig(filename='updater.log', level=logging.INFO, format='%(asctime)s %(message)s')
+        logging.basicConfig(filename=UPDATERLOGFILE, level=logging.INFO, format='%(asctime)s %(message)s')
         logging.info('Checker started')
 
     # Возвращает последний элемент справочника
@@ -98,7 +97,6 @@ class Refresher:
                     self.sendMail('upd', i, lastTag)
         return self.currentTags
 
-
     # Забрать конфигурационную строку из .env
     def getConfEnvFile(self, repo):
         with open(os.path.join(COMPOSERLOCATION, COMPOSEENVFILE)) as envFile:
@@ -144,5 +142,3 @@ class Refresher:
                     intDict[arr[0]] = re.sub(r'/[0-9]{2}', '', arr[1])
             ip = intDict[INTERFACE]
         return ip
-
-

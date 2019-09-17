@@ -10,8 +10,5 @@ def run():
         refresher.deploy()
 
 
-#if __name__ == '__main__':
-    #run()
-
-checker = Checker()
-checker.checkNsend()
+if __name__ == '__main__':
+    run()

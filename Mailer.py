@@ -3,13 +3,20 @@
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import configparser
+
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 warnMessage = "Rushydro {} will be updated to {} on server {}"
 infoMessage = "Rushydro {} {} available to update on server {}"
 updMessage = "Rushydro {} updated to {} on server {}"
 alertMessage = "Rushydro {} not running on {}"
-lastChanseGoodMessage = "Rushydro is started a"
 subjects = {'info': 'Rushydro Info', 'alert': 'Rushydro Alert'}
+
+SMTP_SERVER = config.get('Mailer', 'SMTP_SERVER')
+SENDER_EMAIL = config.get('Mailer', 'SENDER_EMAIL')
+PASSWORD_EMAIL = config.get('Mailer', 'EMAIL_PASSWORD')
 
 recipientsWarning = ["margarinum@gmail.com"]
 recipientsUpdate = ["margarinum@gmail.com"]
@@ -20,10 +27,7 @@ recipientsAlert = ["margarinum@gmail.com"]
 class Mailer(object):
     # Волшебный конструктор с резиновым массивом **kwargs
     def __init__(self, mailType, **kwargs):
-        self.smtpServer = 'smtp.gmail.com: 587'
-        self.senderEmail = "rushydroupdater@gmail.com"
-        self.password = "unidataplatform"
-        self.recepients = ''
+        self.recepients = None
         self.mailType = mailType
         self.subject = None
         self.message = None
@@ -56,10 +60,10 @@ class Mailer(object):
         msg = MIMEMultipart()
         msg['Subject'] = self.subject
         msg.attach(MIMEText(self.message, 'plain'))
-        server = smtplib.SMTP(self.smtpServer)
+        server = smtplib.SMTP(SMTP_SERVER)
         server.starttls()
-        server.login(self.senderEmail, self.password)
-        server.sendmail(self.senderEmail, ", ".join(self.recepients), msg.as_string())
+        server.login(SENDER_EMAIL, PASSWORD_EMAIL)
+        server.sendmail(SENDER_EMAIL, ", ".join(self.recepients), msg.as_string())
         server.quit()
 
 '''
