@@ -12,17 +12,14 @@ tasks = [
     {
         'id': 'current',
         'title': u'Get current commits',
-        'done': False
     },
     {
         'id': 'check',
         'title': u'Get current commits',
-        'done': False
     },
     {
         'id': 'update',
         'title': u'refresh to newest',
-        'done': False
     }
 ]
 

@@ -1,5 +1,6 @@
 #!/usr/bin/python3.6
 from Refresher import Refresher
+from Checker import Checker
 
 
 def run():
@@ -9,5 +10,8 @@ def run():
         refresher.deploy()
 
 
-if __name__ == '__main__':
-    run()
+#if __name__ == '__main__':
+    #run()
+
+checker = Checker()
+checker.checkNsend()

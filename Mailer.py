@@ -8,6 +8,7 @@ warnMessage = "Rushydro {} will be updated to {} on server {}"
 infoMessage = "Rushydro {} {} available to update on server {}"
 updMessage = "Rushydro {} updated to {} on server {}"
 alertMessage = "Rushydro {} not running on {}"
+lastChanseGoodMessage = "Rushydro is started a"
 subjects = {'info': 'Rushydro Info', 'alert': 'Rushydro Alert'}
 
 recipientsWarning = ["margarinum@gmail.com"]

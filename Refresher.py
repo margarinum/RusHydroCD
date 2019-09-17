@@ -18,17 +18,17 @@ config.read('config.ini')
 # Доделать
 
 # Registry
-REGISTRY = 'https://docreg.taskdata.work'
-COMPOSEENVFILE = '.env'
+REGISTRY = config.get('Refresher', 'REGISTRY')
+COMPOSEENVFILE = config.get('Shared', 'COMPOSEENVFILE')
 REG_USERNAME = config.get('Refresher', 'REG_USERNAME')
 REG_PASSWORD = config.get('Refresher', 'REG_PASSWORD')
 
+COMPOSERLOCATION = config.get('Shared', 'COMPOSEDIRECTORY')
 CONFTYPEBACKEND = config.get('Refresher', 'CONFTYPEBACKEND')
 CONFTYPEFRONTEND = config.get('Refresher', 'CONFTYPEFRONTEND')
 BACKENDREPO = config.get('Refresher', 'BACKENDREPO')
 FRONTENDREPO = config.get('Refresher', 'FRONTENDREPO')
 
-# Включение задержки между предупреждением и обновлением
 INTERFACE = 'wlp4s0'
 
 
@@ -36,23 +36,22 @@ class Refresher:
 
     def __init__(self):
         self.repos = {BACKENDREPO: CONFTYPEBACKEND, FRONTENDREPO: CONFTYPEFRONTEND}
-        self.lastCheckedTags = {BACKENDREPO: self.getTagFromString(CONFTYPEBACKEND),
-                                FRONTENDREPO: self.getTagFromString(CONFTYPEFRONTEND)}
         self.currentTags = self.getCurrentTags()
-        self.NEEDPOST = True
         self.DEPLOYONLYMASTERBACKEND = False
-
         self.NEEDPOST = False
-
         logging.basicConfig(filename='updater.log', level=logging.INFO, format='%(asctime)s %(message)s')
+        logging.info('Checker started')
 
     # Возвращает последний элемент справочника
     def getLastItemDict(self, dictIn):
         return dictIn[int(sorted(dictIn.keys())[-1])]
 
     # Управление Composer
-    def composerController(self, command):
-        print(os.system('./{}'.format(command)))
+    def composerStop(self):
+        os.system('cd {}; ./{}'.format(COMPOSERLOCATION, 'stop'))
+
+    def composerStart(self):
+        os.system('cd {}; ./{}'.format(COMPOSERLOCATION, 'start'))
 
     # Забрать все теги из репозитория
     def getAllTagsRegistry(self, repo, reg=REGISTRY):
@@ -89,9 +88,10 @@ class Refresher:
         self.currentTags = self.getCurrentTags()
         for i in self.repos.keys():
             if self.currentTags[i] != self.getLastTagRegistry(i):
+                self.composerStop()
                 lastTag = self.getLastTagRegistry(i)
                 self.editConf(i, lastTag)
-                self.composerController('start')
+                self.composerStart()
                 self.currentTags = self.getCurrentTags()
                 logging.info('{} updates to {}'.format(i, lastTag))
                 if self.NEEDPOST:
@@ -101,31 +101,27 @@ class Refresher:
 
     # Забрать конфигурационную строку из .env
     def getConfEnvFile(self, repo):
-        with open(os.path.join(os.getcwd(), COMPOSEENVFILE)) as envFile:
+        with open(os.path.join(COMPOSERLOCATION, COMPOSEENVFILE)) as envFile:
             for line in envFile:
-                allConfString = list(re.findall(r'{}=\S+$'.format(repo), line))
+                allConfString = list(re.findall(r'{}=\S+$'.format(self.repos[repo]), line))
                 if len(allConfString) > 0:
                     return allConfString[0]
 
     def getTagFromString(self, repo):
-        with open(os.path.join(os.getcwd(), COMPOSEENVFILE)) as envFile:
-            for line in envFile:
-                allConfString = list(re.findall(r'{}=\S+$'.format(repo), line))
-                if len(allConfString) > 0:
-                    return str(allConfString[0]).replace(repo + '=', '')
-
+        line = self.getConfEnvFile(repo)
+        return line.replace(self.repos[repo] + '=', '')
 
     def getCurrentTags(self):
         dct = {}
         for rep in self.repos:
-            dct[rep] = self.getTagFromString(self.repos[rep])
+            dct[rep] = self.getTagFromString(rep)
         return dct
 
     # Изменение конфигурационного файла
     def editConf(self, repo, tag):
-        confString = str(self.getConfEnvFile(self.repos[repo]))
-        newConfString = confString.replace(self.getTagFromString(self.repos[repo]), tag)
-        for line in fileinput.input(os.path.join(os.getcwd(), COMPOSEENVFILE), inplace=1, backup='.bak'):
+        confString = str(self.getConfEnvFile(repo))
+        newConfString = confString.replace(self.getTagFromString(repo), tag)
+        for line in fileinput.input(os.path.join(COMPOSERLOCATION, COMPOSEENVFILE), inplace=1, backup='.bak'):
             print(line.replace(confString, newConfString), end='')
 
     # Поиск IP машины

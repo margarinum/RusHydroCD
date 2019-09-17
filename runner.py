@@ -4,7 +4,7 @@ import time
 import logging
 from Refresher import Refresher
 UPDATERFILENAME = 'Refresher.py'
-CHECKERFILENAME = 'checkImages.py'
+CHECKERFILENAME = 'Checker.py'
 MAILERFILENAME = 'Mailer.py'
 SLEEPINTERVAL = 900
 UPDATERLOGFILE = 'updater.log'
