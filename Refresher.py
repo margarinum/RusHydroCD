@@ -3,7 +3,6 @@
 import os
 import requests
 import fileinput
-import time
 import logging
 import platform
 import subprocess
