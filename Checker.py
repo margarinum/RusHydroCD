@@ -2,7 +2,6 @@
 
 import os
 from Mailer import Mailer
-import refreshTagEmail
 import logging
 import yaml
 import configparser
