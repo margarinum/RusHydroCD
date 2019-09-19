@@ -26,7 +26,7 @@ class Checker:
     def __init__(self):
 
         self.recepients = recepients
-        self.needPost = NEEDPOST
+        self.NEEDPOST = NEEDPOST
         self.lastChanse = True
         logging.basicConfig(filename=UPDATERLOGFILE, level=logging.INFO, format='%(asctime)s %(message)s')
 
@@ -61,11 +61,11 @@ class Checker:
         mailer.send()
 
     # Отправляем письмо
-    def checkNsend(self):
+    def check(self):
         badImages = self.checkRunningImages()
         if badImages:
             refresher = Refresher()
-            if self.needPost:
+            if self.NEEDPOST:
                 self.post(badImages, refresher)
             if LASTCHANSE:
                 refresher.composerStop()
