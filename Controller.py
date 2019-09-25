@@ -9,7 +9,7 @@ import API
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-CHECKERSPERIOD = config.getint('Contoller', 'CHECKERSPERIOD') * 60
+CHECKERSPERIOD = config.getint('Controller', 'CHECKERSPERIOD') * 60
 
 
 def runRefresh():
