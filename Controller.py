@@ -10,16 +10,18 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 
 CHECKERSPERIOD = config.getint('Controller', 'CHECKERSPERIOD') * 60
+AUTODELOY = config.getboolean('Controller', 'AUTODEPLOY')
 
 
-def runRefresh():
+def runRefreshnChecker():
     refresher = Refresher()
     refresher.NEEDPOST = True
     checker = Checker()
     checker.NEEDPOST = True
     while True:
-        if refresher.checkLocalTagRegistry():
-            refresher.deploy()
+        if AUTODELOY:
+            if refresher.checkLocalTagRegistry():
+                    refresher.deploy()
         checker.check()
         time.sleep(CHECKERSPERIOD)
 
@@ -28,7 +30,7 @@ def runApi():
 
 
 def thr():
-    refresherThread = threading.Thread(target=runRefresh)
+    refresherThread = threading.Thread(target=runRefreshnChecker)
     apiThread = threading.Thread(target=runApi)
 
     refresherThread.start()
