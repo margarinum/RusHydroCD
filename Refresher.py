@@ -39,7 +39,7 @@ class Refresher:
         self.DEPLOYONLYMASTERBACKEND = False
         self.NEEDPOST = False
         logging.basicConfig(filename=UPDATERLOGFILE, level=logging.INFO, format='%(asctime)s %(message)s')
-        logging.info('Checker started')
+        logging.info('Deployer started')
 
     # Возвращает последний элемент справочника
     def getLastItemDict(self, dictIn):
@@ -52,6 +52,21 @@ class Refresher:
     def composerStart(self):
         os.system('cd {}; ./{}'.format(COMPOSERLOCATION, 'start'))
 
+    # Получаем обработанный массив работающих имеджей
+    def getRunningImages(self):
+        imagesList = []
+        output = os.popen('docker ps -f status=running --format "{{.Names}}"').read()
+        for item in output.split('\n'):
+            if len(item) > 1:
+                imagesList.append(str(item).replace('composer_', '').replace('_1', ''))
+        return imagesList
+
+    def getStateCompose(self):
+        if len(self.getRunningImages()) > 0:
+            return True
+        else:
+            return False
+
     # Забрать все теги из репозитория
     def getAllTagsRegistry(self, repo, reg=REGISTRY):
         queryString = str('{}/v2/{}/tags/list'.format(reg, repo))
@@ -62,7 +77,7 @@ class Refresher:
     # Забрать последний тег из репозитория
     def getLastTagRegistry(self, repo):
         allCommits = self.getAllTagsRegistry(repo)
-        if self.DEPLOYONLYMASTERBACKEND and repo == self.repos[0]:
+        if self.DEPLOYONLYMASTERBACKEND and repo == BACKENDREPO:
             masterBackendCommits = {}
             for item in allCommits.keys():
                 if 'master' in allCommits[item]:
@@ -76,6 +91,8 @@ class Refresher:
         for i in self.repos.keys():
             if self.currentTags[i] != self.getLastTagRegistry(i):
                 checked[i] = self.getLastTagRegistry(i)
+            else:
+                logging.info('{}: no new tags found'.format(i))
         return checked
 
     def sendMail(self, type, repo, tag):
@@ -87,10 +104,10 @@ class Refresher:
         self.currentTags = self.getCurrentTags()
         for i in self.repos.keys():
             if self.currentTags[i] != self.getLastTagRegistry(i):
-                self.composerStop()
+                if self.getStateCompose():
+                    self.composerStop()
                 lastTag = self.getLastTagRegistry(i)
                 self.editConf(i, lastTag)
-                self.composerStart()
                 self.currentTags = self.getCurrentTags()
                 logging.info('{} updates to {}'.format(i, lastTag))
                 if self.NEEDPOST:
@@ -101,13 +118,14 @@ class Refresher:
     def getConfEnvFile(self, repo):
         with open(os.path.join(COMPOSERLOCATION, COMPOSEENVFILE)) as envFile:
             for line in envFile:
-                allConfString = list(re.findall(r'{}=\S+$'.format(self.repos[repo]), line))
-                if len(allConfString) > 0:
-                    return allConfString[0]
+                allConfString = re.match(r'{}=\S+$'.format(self.repos[repo]), line)
+                if allConfString:
+                    return allConfString.group(0)
 
     def getTagFromString(self, repo):
         line = self.getConfEnvFile(repo)
-        return line.replace(self.repos[repo] + '=', '')
+        if type(line) == str:
+            return line.replace(self.repos[repo] + '=', '')
 
     def getCurrentTags(self):
         dct = {}
@@ -118,7 +136,7 @@ class Refresher:
     # Изменение конфигурационного файла
     def editConf(self, repo, tag):
         confString = str(self.getConfEnvFile(repo))
-        newConfString = confString.replace(self.getTagFromString(repo), tag)
+        newConfString = confString.replace(str(self.getTagFromString(repo)), str(tag))
         for line in fileinput.input(os.path.join(COMPOSERLOCATION, COMPOSEENVFILE), inplace=1, backup='.bak'):
             print(line.replace(confString, newConfString), end='')
 

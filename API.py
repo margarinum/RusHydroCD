@@ -1,51 +1,32 @@
 #!/usr/bin/python3.6
 
-from flask import Flask, jsonify, Response
+from flask import Flask, jsonify, Response, request, send_file
 from Refresher import Refresher
+from Runner import Runner
+from Checker import Checker
+import threading
+import logging
+import configparser
 
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+runner = Runner()
+runnerStatus = False
 refresher = Refresher()
+checker = Checker()
 
-class EndpointAction(object):
-
-    def __init__(self, action):
-        self.action = action
-        self.response = Response(status=200, headers={})
-
-    def __call__(self, *args):
-        # self.action()
-        return self.action()
+UPDATERLOGFILE = config.get('Shared', 'LOGFILENAME')
+logging.basicConfig(filename=UPDATERLOGFILE, level=logging.INFO, format='%(asctime)s %(message)s')
 
 
-class FlaskAppWrapper(object):
-    app = None
+def startAll():
+    threadSimpleAPI = threading.Thread(target=runSimpleApi)
 
-    def __init__(self, name):
-        self.app = Flask(name)
+    threadSimpleAPI.daemon = True
+    threadSimpleAPI.start()
 
-    def run(self):
-        self.app.run(host='0.0.0.0')
-
-    def add_endpoint(self, endpoint=None, endpoint_name=None, handler=None):
-        self.app.add_url_rule(endpoint, endpoint_name, EndpointAction(handler))
-
-
-def getTasks():
-    tasks = [
-        {
-            'id': 'current',
-            'title': u'Get current commits',
-        },
-        {
-            'id': 'check',
-            'title': u'Get current commits',
-        },
-        {
-            'id': 'update',
-            'title': u'Refresh to newest commits',
-        }
-    ]
-
-    return jsonify({'tasks': tasks})
+    threadSimpleAPI.join()
 
 
 def getCurrentTags():
@@ -56,7 +37,7 @@ def getCurrentTags():
 def checkNewTags():
     checked = refresher.checkLocalTagRegistry()
     if not checked:
-        return 'No updates available'
+        return jsonify({'Info': 'No updates available'})
     return jsonify({i: checked[i] for i in checked})
 
 
@@ -67,17 +48,262 @@ def update():
     return jsonify({i: checked[i] for i in checked})
 
 
-def runApi():
+def getAvailableTypes():
+    refresher.NEEDPOST = True
+    repos = refresher.repos
+    return {key: repos[key] for key in repos.keys()}
 
-    a = FlaskAppWrapper('wrap')
-    a.add_endpoint(endpoint='/api/v1.0/tasks', endpoint_name='tasks', handler=getTasks)
-    a.add_endpoint(endpoint='/api/v1.0/tasks/current', endpoint_name='current', handler=getCurrentTags)
-    a.add_endpoint(endpoint='/api/v1.0/tasks/check', endpoint_name='check', handler=checkNewTags)
-    a.add_endpoint(endpoint='/api/v1.0/tasks/update', endpoint_name='update', handler=update)
-    a.run()
+
+def setCommits():
+    tagTypes = getAvailableTypes()
+    params = request.args
+    for paramType in params:
+        if paramType in tagTypes.keys():
+            refresher.editConf(paramType, params[paramType])
+    return getCurrentTags()
+
+
+def startApp():
+    refresher.composerStart()
+    return getComposeState()
+
+
+def stopApp():
+    refresher.composerStop()
+    return getComposeState()
+
+
+def getComposeState():
+    return jsonify({"Application running": refresher.getStateCompose()})
+
+
+def getAllInfo():
+    return jsonify({"Application running": refresher.getStateCompose(), "Autodeploy status": runner.status,
+                    "Period (min)": int(runner.CHECKERSPERIOD / 60)})
+
+
+def getAutoDeployStatus():
+    return jsonify({"Autodeploy status": runner.status,
+                    "Period (min)": int(runner.CHECKERSPERIOD / 60)})
+
+
+def setAutoDeployStatus():
+    global thread
+
+    if request.args.get('set') == 'true':
+        if runner.status:
+            logging.info("AutoDeploy already True")
+            return getAutoDeployStatus()
+
+        runner.setStatus(True)
+        thread = threading.Thread(target=runner.run, args=(), daemon=True)
+        thread.start()
+        logging.info('Autodeploy setted status: %s' % runner.status)
+        return getAutoDeployStatus()
+    if request.args.get('set') != 'true':
+        if not runner.status:
+            return getAutoDeployStatus()
+        runner.setStatus(False)
+        logging.info('Autodeploy setted status: %s' % runner.status)
+        return getAutoDeployStatus()
+
+
+def setAutoDeployPeriod():
+    try:
+        val = int(request.args.get('set'))
+        runner.setPerion(val * 60)
+        return getAutoDeployStatus()
+
+    except ValueError:
+        return jsonify({"Error": "Must be int!"})
+
+
+def containers():
+    return jsonify(checker.getRunningImages())
+
+
+def containerInfo():
+    containers = checker.getInfoByID(request.args.get('get'))
+    if len(containers) > 0:
+        return jsonify(containers)
+    else:
+        return jsonify({'Error': 'Container not started'})
+
+
+def download():
+    containerID = request.args.get('get')
+    if containerID in list(checker.getRunningImages().values()):
+        pathToLogs = checker.getLogs(containerID)
+        logging.info('Saving file ' + pathToLogs)
+        return send_file(pathToLogs, as_attachment=True)
+    else:
+        return jsonify({'Error': 'Container {ID} not started or not exists'.format(ID=containerID)})
+
+
+#    for item in list(checker.getRunningImages().values()):
+#        if item == containerID:
+#            print(1)
+# print(item, containerID)
+# if containerID == item:
+#     pathToLogs = checker.getLogs(containerID)
+#     logging.info('Saving file ' + pathToLogs)
+#     return send_file(pathToLogs, as_attachment=True)
+# else:
+#     return jsonify({'Error': 'Container {ID} not started or not exists'.format(ID=containerID)})
+
+
+def getTasks():
+    tasks = [
+        {
+            'id': '/api/v2.0/tasks/current',
+            'type': u'get',
+            'showTask': True,
+            'title': u'Getting current deployed tags',
+        },
+        {
+            'id': '/api/v2.0/tasks/check',
+            'type': u'get',
+            'showTask': True,
+            'title': u'Checking repo new tags',
+        },
+        {
+            'id': '/api/v2.0/tasks/startApp',
+            'type': u'get',
+            'showTask': True,
+            'title': u'Starting compose',
+        },
+        {
+            'id': '/api/v2.0/tasks/stopApp',
+            'type': u'get',
+            'showTask': True,
+            'title': u'Stopping compose',
+        },
+        {
+            'id': '/api/v2.0/tasks/AppStatus',
+            'type': u'get',
+            'showTask': True,
+            'title': u'Getting compose status',
+        },
+        {
+            'id': '/api/v2.0/tasks/AutoDeployStatus',
+            'type': u'get',
+            'showTask': True,
+            'title': u'Getting autodeploy status',
+        },
+        {
+            'id': '/api/v2.0/tasks/setAutoDeployStatus',
+            'type': u'setBin',
+            'showTask': True,
+            'title': u'Setting auto deploy status, for example: /api/v2.0/tasks/setAutoDeployStatus?set=true',
+        },
+        {
+            'id': '/api/v2.0/tasks/setAutoDeployPeriod',
+            'type': u'setInt',
+            'showTask': True,
+            'title': u'Setting auto deploy period in minutes, for example: /api/v2.0/tasks/setAutoDeployPeriod?min=4',
+        },
+        {
+            'id': '/api/v2.0/tasks/update',
+            'type': u'get',
+            'showTask': True,
+            'title': u'Updating tags to latest from repo, restarting compose',
+        },
+        {
+            'id': '/api/v2.0/tasks/containers',
+            'type': u'getOpts',
+            'showTask': True,
+            'title': u'Get all running containers',
+        },
+        {
+            'id': '/api/v2.0/tasks/containerInfo',
+            'type': u'get',
+            'showTask': False,
+            'title': u'Get all running containers',
+        },
+        {
+            'id': '/api/v2.0/tasks/download',
+            'type': u'getFile',
+            'showTask': False,
+            'title': u'Getting logs from container, for example /api/v2.0/tasks/download?container=<idContainer>',
+        }
+    ]
+
+    return jsonify(tasks)
+
+
+def runSimpleApi():
+    app = Flask(__name__)  # create the Flask app
+
+    @app.route('/api/v2.0/tasks')
+    def getAllTasks():
+        return getTasks()
+
+    @app.route('/api/v2.0/tasks/current')
+    def getCurrTags():
+        return getCurrentTags()
+
+    @app.route('/api/v2.0/tasks/check')
+    def checkTags():
+        return checkNewTags()
+
+    # @app.route('/api/v2.0/tasks/lastTags')
+    # def upd():
+    #     return update()
+
+    # @app.route('/api/v2.0/tasks/setter')
+    # def setterTask():
+    #    return setCommits()
+
+    @app.route('/api/v2.0/tasks/startApp')
+    def startAppTask():
+        return startApp()
+
+    @app.route('/api/v2.0/tasks/stopApp')
+    def stopTask():
+        return stopApp()
+
+    @app.route('/api/v2.0/tasks/AppStatus')
+    def getStateAppTask():
+        return getComposeState()
+
+    @app.route('/api/v2.0/tasks/AutoDeployStatus')
+    def autoDeployStatusTask():
+        return getAutoDeployStatus()
+
+    @app.route('/api/v2.0/tasks/setAutoDeployStatus')
+    def setAutoDeployStatusTask():
+        return setAutoDeployStatus()
+
+    @app.route('/api/v2.0/tasks/setAutoDeployPeriod')
+    def getAutoDeployPeriodTask():
+        return setAutoDeployPeriod()
+
+    @app.route('/api/v2.0/tasks/update')
+    def updater():
+        return update()
+
+    @app.route('/api/v2.0/tasks/containers')
+    def containersTask():
+        return containers()
+
+    @app.route('/api/v2.0/tasks/containerInfo')
+    def containerInfoTask():
+        return containerInfo()
+
+    @app.route('/api/v2.0/tasks/download')
+    def downloadTask():
+        return download()
+
+    # Отправка команды не сохранять кэш
+    @app.after_request
+    def after_request(response):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, public, max-age=0"
+        response.headers["Expires"] = '0'
+        response.headers["Pragma"] = "no-cache"
+        return response
+
+    app.run(host='0.0.0.0', debug=False, port=5000)
 
 
 if __name__ == '__main__':
-    runApi()
-
-
+    startAll()
