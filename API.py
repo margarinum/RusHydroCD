@@ -4,6 +4,7 @@ from flask import Flask, jsonify, Response, request, send_file
 from Refresher import Refresher
 from Runner import Runner
 from Checker import Checker
+from Test import Test
 import threading
 import logging
 import configparser
@@ -15,6 +16,7 @@ runner = Runner()
 runnerStatus = False
 refresher = Refresher()
 checker = Checker()
+test = Test()
 
 UPDATERLOGFILE = config.get('Shared', 'LOGFILENAME')
 logging.basicConfig(filename=UPDATERLOGFILE, level=logging.INFO, format='%(asctime)s %(message)s')
@@ -140,16 +142,32 @@ def download():
         return jsonify({'Error': 'Container {ID} not started or not exists'.format(ID=containerID)})
 
 
-#    for item in list(checker.getRunningImages().values()):
-#        if item == containerID:
-#            print(1)
-# print(item, containerID)
-# if containerID == item:
-#     pathToLogs = checker.getLogs(containerID)
-#     logging.info('Saving file ' + pathToLogs)
-#     return send_file(pathToLogs, as_attachment=True)
-# else:
-#     return jsonify({'Error': 'Container {ID} not started or not exists'.format(ID=containerID)})
+def getAllTests():
+    if len(list(test.getAllTests())) > 0:
+        return jsonify(test.getAllTests())
+    else:
+        return jsonify({'Error': 'Autotests not found'})
+
+
+def runAllTests():
+    return jsonify(test.runTests(test.getAllTests()))
+
+
+def runTest():
+    testName = request.args.get('get')
+    if testName in test.allTests:
+        return jsonify(test.runTests([testName]))
+    else:
+        return jsonify({'Error': 'Autotest not found'})
+
+
+def getTestInfo():
+    testName = request.args.get('get')
+    print(test.allTests)
+    if testName in test.allTests:
+        return jsonify(test.allTests[testName])
+    else:
+        return jsonify({'Error': 'Autotest not found'})
 
 
 def getTasks():
@@ -225,6 +243,30 @@ def getTasks():
             'type': u'getFile',
             'showTask': False,
             'title': u'Getting logs from container, for example /api/v2.0/tasks/download?container=<idContainer>',
+        },
+        {
+            'id': '/api/v2.0/tasks/autoTests',
+            'type': u'getTests',
+            'showTask': True,
+            'title': u'Getting list of all autotests',
+        },
+        {
+            'id': '/api/v2.0/tasks/runTest',
+            'type': u'get',
+            'showTask': False,
+            'title': u'Run selected autotest',
+        },
+        {
+            'id': '/api/v2.0/tasks/runAllTests',
+            'type': u'get',
+            'showTask': False,
+            'title': u'Run all autotests',
+        },
+        {
+            'id': '/api/v2.0/tasks/getTestInfo',
+            'type': u'get',
+            'showTask': False,
+            'title': u'Getting autotest info',
         }
     ]
 
@@ -237,6 +279,10 @@ def runSimpleApi():
     @app.route('/api/v2.0/tasks')
     def getAllTasks():
         return getTasks()
+
+    @app.route('/api/v2.0/')
+    def heartbeat():
+        return jsonify({'API online': True})
 
     @app.route('/api/v2.0/tasks/current')
     def getCurrTags():
@@ -293,6 +339,22 @@ def runSimpleApi():
     @app.route('/api/v2.0/tasks/download')
     def downloadTask():
         return download()
+
+    @app.route('/api/v2.0/tasks/autoTests')
+    def autoTestsTask():
+        return getAllTests()
+
+    @app.route('/api/v2.0/tasks/runAllTests')
+    def runAllTestsTask():
+        return runAllTests()
+
+    @app.route('/api/v2.0/tasks/runTest')
+    def runTestTask():
+        return runTest()
+
+    @app.route('/api/v2.0/tasks/getTestInfo')
+    def getTestInfoTask():
+        return getTestInfo()
 
     # Отправка команды не сохранять кэш
     @app.after_request
