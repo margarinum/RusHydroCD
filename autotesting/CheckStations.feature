@@ -1,12 +1,9 @@
-# Created by dima at 13.05.20
 Feature: CheckStations
 
-  Scenario: Open module station
+  Scenario: Open module "Станции" and check table of results
 
     Given website localhost
-    #Given website "http://localhost/"
     When wait element 'Войти'
-    #Then input 'admin' to placeholder 'Логин'
     Then input login
     Then input password
     Then push button 'Войти'

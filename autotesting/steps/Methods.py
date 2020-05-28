@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+import os
 
 
 def waitElem(context, text):
@@ -24,21 +25,36 @@ def waitPlaceholder(context, text):
 def step(context, url):
     # Измените строку, для выполнения теста в другом браузере
     options = Options()
-    options.headless = True
-    context.browser = webdriver.Chrome(executable_path='/home/dima/PycharmProjects/RusHydroCD/chromedriver',
-                                       chrome_options=options)
+    # options.headless = True
+    options.add_argument('--disable-gpu')
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    print(os.path.join(os.getcwd(), 'chromedriver'))
+    context.browser = webdriver.Chrome(os.path.join(os.getcwd(), 'autotesting', 'steps', 'chromedriver'),
+                                       chrome_options=options,
+                                       service_log_path=os.path.join(os.getcwd(), 'chromedriver.log'))
     context.browser.maximize_window()
     context.browser.get(url)
+
 
 @given('website localhost')
 def step(context):
     # Измените строку, для выполнения теста в другом браузере
     options = Options()
-    options.headless = True
-    context.browser = webdriver.Chrome(executable_path='/home/dima/PycharmProjects/RusHydroCD/chromedriver',
-                                       chrome_options=options)
+    # options.headless = True
+    options.add_argument('--disable-gpu')
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    # options.add_argument('--disable-dev-shm-usage')
+    print(os.path.join(os.getcwd(), 'chromedriver'))
+
+    context.browser = webdriver.Chrome(
+        executable_path=os.path.join(os.getcwd(), 'autotesting', 'steps', 'chromedriver'),
+        chrome_options=options,
+        service_log_path=os.path.join(os.getcwd(), 'chromedriver.log'))
     context.browser.maximize_window()
-    context.browser.get('http://localhost')
+    context.browser.get('http://localhost/')
 
 
 @when("wait element '{text}'")

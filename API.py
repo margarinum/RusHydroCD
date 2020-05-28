@@ -1,6 +1,6 @@
 #!/usr/bin/python3.6
 
-from flask import Flask, jsonify, Response, request, send_file
+from flask import Flask, jsonify, Response, render_template, request, send_file, redirect, url_for
 from Refresher import Refresher
 from Runner import Runner
 from Checker import Checker
@@ -8,9 +8,13 @@ from Test import Test
 import threading
 import logging
 import configparser
+import os
+from werkzeug.utils import secure_filename
 
 config = configparser.ConfigParser()
 config.read('config.ini')
+uploadFileAllowedExt = {'feature'}
+MAX_FILE_SIZE = 1024 * 1024 + 1
 
 runner = Runner()
 runnerStatus = False
@@ -150,7 +154,7 @@ def getAllTests():
 
 
 def runAllTests():
-    return jsonify(test.runTests(test.getAllTests()))
+    return jsonify(test.runTests(test.allTests))
 
 
 def runTest():
@@ -168,6 +172,59 @@ def getTestInfo():
         return jsonify(test.allTests[testName])
     else:
         return jsonify({'Error': 'Autotest not found'})
+
+
+def setTestreportStoreStatus():
+    if request.args.get('set') == 'true':
+        test.setStoreReportsStatus(True)
+    else:
+        test.setStoreReportsStatus(False)
+    return jsonify({'Storing autotest reports': test.getStoreReportsStatus()})
+
+
+def getTestFile():
+    testFile = request.args.get('get')
+    if testFile in list(test.allTests):
+        return send_file(test.getPathTestFile(testFile),
+                         as_attachment=True)
+    else:
+        return jsonify({'Error': 'Test file {} not found'.format(testFile)})
+
+
+def getTestReport():
+    testName = request.args.get('get')
+    if testName in list(test.allTests):
+        return send_file(test.getPathTestReport(testName),
+                         as_attachment=True)
+    else:
+        return jsonify({'Error': 'Test {} not found'.format(testName)})
+
+
+def uploadTestFile():
+    if request.method == 'POST':
+        file = request.files['file']
+        if file and allowedFile(file.filename):
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(test.getAutotestsDir(), filename))
+            return jsonify({'Status': '{}'.format(filename)})
+            # return redirect(url_for('uploaded_file',
+            #                        filename=filename))
+        else:
+            jsonify({'Error': 'File must be .feature extension'})
+    return '''
+    <!doctype html>
+    <title>Upload Test File</title>
+    <h1>Upload Test File</h1>
+    <form action="" method=post enctype=multipart/form-data>
+      <p><input type=file name=file>
+         <input type=submit value=Upload>
+    </form>
+    '''
+
+
+def allowedFile(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1] in uploadFileAllowedExt
 
 
 def getTasks():
@@ -252,7 +309,7 @@ def getTasks():
         },
         {
             'id': '/api/v2.0/tasks/runTest',
-            'type': u'get',
+            'type': u'getTestReport',
             'showTask': False,
             'title': u'Run selected autotest',
         },
@@ -267,6 +324,24 @@ def getTasks():
             'type': u'get',
             'showTask': False,
             'title': u'Getting autotest info',
+        },
+        {
+            'id': '/api/v2.0/tasks/setTestreportStoreStatus',
+            'type': u'get',
+            'showTask': False,
+            'title': u'Setting status of storing test reports',
+        },
+        {
+            'id': '/api/v2.0/tasks/getTestFile',
+            'type': u'getFile',
+            'showTask': False,
+            'title': u'Getting test file',
+        },
+        {
+            'id': '/api/v2.0/tasks/getTestReport',
+            'type': u'getFile',
+            'showTask': False,
+            'title': u'Getting test report file',
         }
     ]
 
@@ -355,6 +430,24 @@ def runSimpleApi():
     @app.route('/api/v2.0/tasks/getTestInfo')
     def getTestInfoTask():
         return getTestInfo()
+
+    @app.route('/api/v2.0/tasks/setTestreportStoreStatus')
+    def setTestreportStoreStatusTask():
+        return setTestreportStoreStatus()
+
+    @app.route('/api/v2.0/tasks/getTestFile')
+    def getTestFileTask():
+        return getTestFile()
+
+    @app.route('/api/v2.0/tasks/getTestReport')
+    def getTestReportTask():
+        return getTestReport()
+
+    @app.route('/api/v2.0/tasks/uploadTestFile', methods=['GET', 'POST'])
+    def uploadTestFileTask():
+        return uploadTestFile()
+
+    # @app.route('/uploader', methods=['GET', 'POST'])
 
     # Отправка команды не сохранять кэш
     @app.after_request
