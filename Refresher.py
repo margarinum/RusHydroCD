@@ -104,6 +104,8 @@ class Refresher:
         self.currentTags = self.getCurrentTags()
         for i in self.repos.keys():
             if self.currentTags[i] != self.getLastTagRegistry(i):
+                print(self.currentTags[i])
+                print(self.getLastTagRegistry(i))
                 if self.getStateCompose():
                     self.composerStop()
                 lastTag = self.getLastTagRegistry(i)

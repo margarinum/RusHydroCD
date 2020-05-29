@@ -211,6 +211,7 @@ def uploadTestFile():
             #                        filename=filename))
         else:
             jsonify({'Error': 'File must be .feature extension'})
+    test.refreshTestsList()
     return '''
     <!doctype html>
     <title>Upload Test File</title>

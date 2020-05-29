@@ -18,6 +18,9 @@ class Test:
         self.storeReportStatus = True
         self.allTests = self.getAllTests()
 
+    def refreshTestsList(self):
+        self.allTests = self.getAllTests()
+
     def getAutotestsDir(self):
         return os.path.join(os.getcwd(), directoryTests)
 
